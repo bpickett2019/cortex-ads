@@ -39,7 +39,7 @@ export async function llmComplianceReview(
 
     try {
         const response = await anthropic.messages.create({
-            model: 'claude-opus-4-5-20251101',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 2000,
             temperature: 0,
             system: 'You are a healthcare advertising compliance attorney. Respond with valid JSON only.',

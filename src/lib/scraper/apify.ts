@@ -3,7 +3,7 @@
 // Competitor ad scraping for Meta Ad Library
 // =============================================
 
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN!;
 const APIFY_ACTOR_ID = process.env.APIFY_ACTOR_ID || 'apify~facebook-ads-scraper';
@@ -72,8 +72,7 @@ export async function startScraperRun(
   const data = await response.json();
   
   // Store run reference in database
-  const supabase = await createClient();
-  await supabase.from('scraping_jobs').insert({
+  await supabaseAdmin.from('scraping_jobs').insert({
     clinic_id: clinicId,
     competitor_id: competitorId,
     apify_run_id: data.data.id,
@@ -134,14 +133,12 @@ export async function processScrapedAds(
   clinicId: string,
   competitorId: string
 ): Promise<{ stored: number; analyzed: number }> {
-  const supabase = await createClient();
-  
   let stored = 0;
   let analyzed = 0;
 
   for (const ad of ads) {
     // Skip if already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('competitor_ads')
       .select('id')
       .eq('meta_ad_id', ad.adId)
@@ -149,7 +146,7 @@ export async function processScrapedAds(
 
     if (existing) {
       // Update last seen
-      await supabase
+      await supabaseAdmin
         .from('competitor_ads')
         .update({
           last_seen: new Date().toISOString(),
@@ -167,7 +164,7 @@ export async function processScrapedAds(
     analyzed++;
 
     // Store new ad
-    const { error } = await supabase.from('competitor_ads').insert({
+    const { error } = await supabaseAdmin.from('competitor_ads').insert({
       clinic_id: clinicId,
       competitor_id: competitorId,
       meta_ad_id: ad.adId,
@@ -286,9 +283,7 @@ function calculateDaysRunning(startDate?: string, endDate?: string): number {
  * Get competitor insights summary
  */
 export async function getCompetitorInsights(clinicId: string): Promise<any> {
-  const supabase = await createClient();
-  
-  const { data: ads } = await supabase
+  const { data: ads } = await supabaseAdmin
     .from('competitor_ads')
     .select('*')
     .eq('clinic_id', clinicId)

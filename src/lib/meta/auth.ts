@@ -4,6 +4,7 @@
 // =============================================
 
 import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { encrypt, decrypt } from '@/lib/utils/encryption';
 
 const META_APP_ID = process.env.META_APP_ID!;
@@ -86,6 +87,29 @@ export async function getLongLivedToken(
 }
 
 /**
+ * Refresh a long-lived token before expiration
+ */
+export async function refreshLongLivedToken(
+  accessToken: string
+): Promise<string> {
+  const params = new URLSearchParams({
+    grant_type: 'fb_exchange_token',
+    client_id: META_APP_ID,
+    client_secret: META_APP_SECRET,
+    fb_exchange_token: accessToken,
+  });
+
+  const response = await fetch(`${META_GRAPH_URL}/oauth/access_token?${params.toString()}`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to refresh token');
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
+/**
  * Get ad accounts accessible to the user
  */
 export async function getAdAccounts(accessToken: string): Promise<
@@ -117,8 +141,6 @@ export async function storeMetaTokens(
   expiresIn: number,
   adAccountId?: string
 ): Promise<void> {
-  const supabase = await createClient();
-  
   const encryptedToken = encrypt(accessToken);
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
@@ -131,7 +153,7 @@ export async function storeMetaTokens(
     update.meta_ad_account_id = adAccountId;
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('clinics')
     .update(update)
     .eq('id', clinicId);
@@ -142,12 +164,10 @@ export async function storeMetaTokens(
 }
 
 /**
- * Retrieve and decrypt Meta access token
+ * Retrieve and decrypt Meta access token (with auto-refresh)
  */
 export async function getMetaAccessToken(clinicId: string): Promise<string | null> {
-  const supabase = await createClient();
-  
-  const { data: clinic } = await supabase
+  const { data: clinic } = await supabaseAdmin
     .from('clinics')
     .select('meta_access_token_encrypted, meta_token_expires_at')
     .eq('id', clinicId)
@@ -157,16 +177,36 @@ export async function getMetaAccessToken(clinicId: string): Promise<string | nul
     return null;
   }
 
-  // Check if token is expired
+  const token = decrypt(clinic.meta_access_token_encrypted);
+
+  // Check if token needs refresh (expires in less than 7 days)
   if (clinic.meta_token_expires_at) {
     const expiresAt = new Date(clinic.meta_token_expires_at);
-    if (expiresAt < new Date()) {
-      // Token expired - would need refresh logic here
-      return null;
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    if (expiresAt < sevenDaysFromNow) {
+      try {
+        // Refresh the token
+        const newToken = await refreshLongLivedToken(token);
+        const newExpiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // ~60 days
+        
+        await storeMetaTokens(
+          clinicId,
+          newToken,
+          60 * 24 * 60 * 60,
+          undefined // Don't change ad account
+        );
+        
+        return newToken;
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        // Return existing token as fallback
+      }
     }
   }
 
-  return decrypt(clinic.meta_access_token_encrypted);
+  return token;
 }
 
 /**
@@ -248,20 +288,47 @@ interface AdCreativeConfig {
 }
 
 /**
- * Create a new campaign
+ * Find or create a campaign for a clinic (prevents fragmentation)
  */
-export async function createCampaign(
+async function findOrCreateCampaign(
   adAccountId: string,
   accessToken: string,
-  config: CampaignConfig
+  clinicId: string,
+  campaignName: string,
+  dailyBudget: number
 ): Promise<string> {
+  // Check if clinic already has a campaign
+  const { data: existingConcept } = await supabaseAdmin
+    .from('ad_concepts')
+    .select('meta_campaign_id')
+    .eq('clinic_id', clinicId)
+    .not('meta_campaign_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingConcept?.meta_campaign_id) {
+    // Verify campaign still exists in Meta
+    try {
+      const response = await fetch(
+        `${META_GRAPH_URL}/${existingConcept.meta_campaign_id}?access_token=${accessToken}`
+      );
+      if (response.ok) {
+        return existingConcept.meta_campaign_id;
+      }
+    } catch (error) {
+      console.log('Existing campaign not found, creating new one');
+    }
+  }
+
+  // Create new campaign
   const endpoint = `/${adAccountId}/campaigns`;
   
   const body = {
-    name: config.name,
-    objective: config.objective,
-    status: config.status,
+    name: campaignName,
+    objective: 'LEADS',
+    status: 'ACTIVE',
     special_ad_categories: ['HEALTHCARE'],
+    daily_budget: Math.round(dailyBudget * 100), // cents
     access_token: accessToken,
   };
 
@@ -313,7 +380,6 @@ export async function uploadImage(
   accessToken: string,
   imageUrl: string
 ): Promise<string> {
-  // For URLs, Meta can fetch directly
   const endpoint = `/${adAccountId}/adimages`;
   
   const body = {
@@ -403,7 +469,56 @@ export async function createAd(
 }
 
 /**
- * Full publishing pipeline: Create campaign → ad set → creative → ad
+ * Convert AI-generated target_audience to Meta targeting spec
+ */
+function buildTargetingSpec(targetAudience: any): AdSetConfig['targeting'] {
+  const targeting: AdSetConfig['targeting'] = {
+    geoLocations: { countries: ['US'] },
+    genders: [],
+  };
+
+  // Map gender from AI targeting
+  if (targetAudience?.gender) {
+    const genderMap: Record<string, number> = {
+      'male': 1,
+      'female': 2,
+      'all': 0,
+    };
+    const genderCode = genderMap[targetAudience.gender];
+    if (genderCode !== undefined) {
+      targeting.genders = genderCode === 0 ? [1, 2] : [genderCode];
+    }
+  } else {
+    // Default to men (typical for TRT)
+    targeting.genders = [1];
+  }
+
+  // Map age range
+  if (targetAudience?.age_min) {
+    targeting.ageMin = targetAudience.age_min;
+  } else {
+    targeting.ageMin = 30;
+  }
+
+  if (targetAudience?.age_max) {
+    targeting.ageMax = targetAudience.age_max;
+  } else {
+    targeting.ageMax = 65;
+  }
+
+  // Map interests if provided
+  if (targetAudience?.interests && Array.isArray(targetAudience.interests)) {
+    targeting.interests = targetAudience.interests.map((interest: string) => ({
+      id: '', // Would need interest ID lookup from Meta API
+      name: interest,
+    }));
+  }
+
+  return targeting;
+}
+
+/**
+ * Full publishing pipeline: Reuse campaign per clinic, use AI targeting
  */
 export async function publishAd(
   clinicId: string,
@@ -418,16 +533,14 @@ export async function publishAd(
   creativeId: string;
   adId: string;
 }> {
-  const supabase = await createClient();
-  
   // Get clinic and ad concept data
-  const { data: clinic } = await supabase
+  const { data: clinic } = await supabaseAdmin
     .from('clinics')
-    .select('meta_ad_account_id')
+    .select('meta_ad_account_id, name')
     .eq('id', clinicId)
     .maybeSingle();
 
-  const { data: concept } = await supabase
+  const { data: concept } = await supabaseAdmin
     .from('ad_concepts')
     .select('*')
     .eq('id', adConceptId)
@@ -444,31 +557,25 @@ export async function publishAd(
 
   const adAccountId = clinic.meta_ad_account_id;
 
-  // 1. Create campaign
-  const campaignId = await createCampaign(
+  // 1. Find or create consolidated campaign per clinic (prevents fragmentation)
+  const campaignId = await findOrCreateCampaign(
     adAccountId,
     accessToken,
-    {
-      name: `Cortex Campaign - ${concept.headline.slice(0, 30)}`,
-      objective: 'LEADS',
-      status: publishOptions.status,
-      dailyBudget: publishOptions.dailyBudget,
-    }
+    clinicId,
+    `Cortex - ${clinic.name} - Lead Generation`,
+    publishOptions.dailyBudget * 5 // Campaign budget = 5x daily for flexibility
   );
 
-  // 2. Create ad set
+  // 2. Create ad set with AI-generated targeting
+  const targeting = buildTargetingSpec(concept.target_audience);
+  
   const adSetId = await createAdSet(
     adAccountId,
     campaignId,
     accessToken,
     {
-      name: `Ad Set - ${concept.angle_type}`,
-      targeting: {
-        geoLocations: { countries: ['US'] },
-        ageMin: 30,
-        ageMax: 65,
-        genders: [1], // Men
-      },
+      name: `${concept.angle_type} - ${concept.headline.slice(0, 40)}`,
+      targeting,
       optimizationGoal: 'LEADS',
       billingEvent: 'IMPRESSIONS',
     },
@@ -511,7 +618,7 @@ export async function publishAd(
   );
 
   // 6. Update ad concept with Meta IDs
-  await supabase
+  await supabaseAdmin
     .from('ad_concepts')
     .update({
       meta_campaign_id: campaignId,

@@ -74,18 +74,26 @@ export async function scanAd(
             }
         }
 
-        // Check banned patterns (regex)
+        // Check banned patterns (regex) - with ReDoS protection
         for (const pattern of rule.banned_patterns) {
+            // Validate pattern before use (prevent ReDoS)
+            if (!isValidRegexPattern(pattern)) {
+                console.error(`Skipping potentially dangerous regex pattern: ${pattern}`)
+                continue
+            }
+
             try {
                 const regex = new RegExp(pattern, 'i')
-                const match = fullText.match(regex)
+                // Use exec with limited input length to prevent ReDoS
+                const safeText = fullText.substring(0, 10000) // Limit input size
+                const match = regex.exec(safeText)
                 if (match) {
                     issues.push({
                         ruleId: rule.id,
                         ruleName: rule.rule_name,
                         category: rule.category,
                         severity: rule.severity,
-                        textSegment: match[0],
+                        textSegment: match[0].substring(0, 100), // Limit output
                         issueType: 'banned_pattern',
                         explanation: rule.description,
                         suggestedRevision: 'Revise to remove prohibited claim'
@@ -95,6 +103,44 @@ export async function scanAd(
                 console.error(`Invalid regex pattern: ${pattern}`)
             }
         }
+    }
+
+    return issues
+}
+
+/**
+ * Validate regex pattern to prevent ReDoS attacks
+ * Rejects patterns with dangerous constructs
+ */
+function isValidRegexPattern(pattern: string): boolean {
+    // Reject empty patterns
+    if (!pattern || pattern.length === 0) return false
+
+    // Reject overly long patterns
+    if (pattern.length > 500) return false
+
+    // Reject patterns with excessive quantifiers (common ReDoS vector)
+    const dangerousPatterns = [
+        /\([^)]*\+\+/,       // Nested quantifiers like (a+)+ or (a*)+
+        /\([^)]*\*\*/,       // Double star patterns
+        /\([^)]*\+\*/,       // Mixed quantifiers
+        /\{[0-9]+,[0-9]+\}\{/, // Nested quantifiers with braces
+    ]
+
+    for (const dangerous of dangerousPatterns) {
+        if (dangerous.test(pattern)) {
+            console.warn(`Pattern rejected (ReDoS risk): ${pattern}`)
+            return false
+        }
+    }
+
+    // Try to compile to catch syntax errors
+    try {
+        new RegExp(pattern)
+        return true
+    } catch {
+        return false
+    }
     }
 
     return issues

@@ -33,6 +33,19 @@ interface ClinicProfile {
     doctor_info: Array<{ name: string; credentials: string }>
 }
 
+/**
+ * Escape user input to prevent prompt injection attacks
+ * Removes control characters and limits length
+ */
+function escapePromptInput(input: string): string {
+    if (!input) return ''
+    return input
+        .replace(/[{}]/g, '')           // Remove braces that could break JSON structure
+        .replace(/["\\]/g, '')          // Remove quotes and backslashes
+        .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+        .substring(0, 200)              // Limit length
+}
+
 export async function generateAdConcepts(
     clinic: ClinicProfile,
     batchId: string,
@@ -59,15 +72,24 @@ export async function generateAdConcepts(
         analysis: ad.ai_analysis
     })) || []
 
-    const prompt = AD_GENERATION_PROMPT
-        .replace('{{clinicProfile}}', JSON.stringify({
-            name: clinic.name,
-            services: clinic.services,
-            location: clinic.location,
-            doctors: clinic.doctor_info
+    // Build prompt with proper escaping to prevent injection
+    const clinicProfile = {
+        name: escapePromptInput(clinic.name),
+        services: clinic.services.map(escapePromptInput),
+        location: {
+            city: escapePromptInput(clinic.location.city),
+            state: escapePromptInput(clinic.location.state)
+        },
+        doctors: clinic.doctor_info.map(d => ({
+            name: escapePromptInput(d.name),
+            credentials: escapePromptInput(d.credentials)
         }))
+    }
+
+    const prompt = AD_GENERATION_PROMPT
+        .replace('{{clinicProfile}}', JSON.stringify(clinicProfile))
         .replace('{{competitorAnalysis}}', JSON.stringify(competitorAnalysis))
-        .replace('{{count}}', count.toString())
+        .replace('{{count}}', Math.min(count, 20).toString()) // Hard limit
         .replace('{{angleMix}}', JSON.stringify(angleMix))
 
     try {
