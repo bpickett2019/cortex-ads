@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, STRIPE_WEBHOOK_SECRET } from '@/lib/stripe/config';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
@@ -29,8 +29,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -40,7 +38,7 @@ export async function POST(request: NextRequest) {
         const subscriptionId = session.subscription as string;
 
         if (clinicId && subscriptionId) {
-          await supabase
+          await supabaseAdmin
             .from('clinics')
             .update({
               stripe_subscription_id: subscriptionId,
@@ -61,7 +59,7 @@ export async function POST(request: NextRequest) {
           const clinicId = subscription.metadata.clinic_id;
 
           if (clinicId) {
-            await supabase
+            await supabaseAdmin
               .from('clinics')
               .update({
                 subscription_status: 'active',
@@ -81,7 +79,7 @@ export async function POST(request: NextRequest) {
           const clinicId = subscription.metadata.clinic_id;
 
           if (clinicId) {
-            await supabase
+            await supabaseAdmin
               .from('clinics')
               .update({
                 subscription_status: 'past_due',
@@ -97,7 +95,7 @@ export async function POST(request: NextRequest) {
         const clinicId = subscription.metadata.clinic_id;
 
         if (clinicId) {
-          await supabase
+          await supabaseAdmin
             .from('clinics')
             .update({
               subscription_tier: 'starter',
@@ -123,7 +121,7 @@ export async function POST(request: NextRequest) {
           const tier = product.metadata.tier;
 
           if (tier) {
-            await supabase
+            await supabaseAdmin
               .from('clinics')
               .update({
                 subscription_tier: tier,

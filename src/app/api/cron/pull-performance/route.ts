@@ -4,7 +4,7 @@
 // =============================================
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getMetaAccessToken, getAdInsights } from '@/lib/meta/auth';
 
 // Cron secret for authorization
@@ -18,11 +18,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
     const results: any[] = [];
 
     // Get all clinics with Meta auth and published ads
-    const { data: clinics } = await supabase
+    const { data: clinics } = await supabaseAdmin
       .from('clinics')
       .select('id, meta_ad_account_id, meta_access_token_encrypted')
       .not('meta_ad_account_id', 'is', null)
@@ -52,7 +51,7 @@ export async function GET(request: Request) {
         }
 
         // Get published ad concepts for this clinic
-        const { data: ads } = await supabase
+        const { data: ads } = await supabaseAdmin
           .from('ad_concepts')
           .select('id, meta_ad_id')
           .eq('clinic_id', clinic.id)
@@ -101,7 +100,7 @@ export async function GET(request: Request) {
           const cpl = leads > 0 ? spend / leads : 0;
 
           // Upsert performance record
-          const { error } = await supabase
+          const { error } = await supabaseAdmin
             .from('ad_performance')
             .upsert(
               {

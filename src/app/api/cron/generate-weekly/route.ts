@@ -4,7 +4,7 @@
 // =============================================
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateAdConcepts } from '@/lib/ai/generate-ads';
 import { auditLog } from '@/lib/utils/audit';
 
@@ -17,12 +17,10 @@ export async function GET(request: Request) {
     if (authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const supabase = await createClient();
     const results: any[] = [];
 
     // Get all clinics with completed onboarding
-    const { data: clinics } = await supabase
+    const { data: clinics } = await supabaseAdmin
       .from('clinics')
       .select('*')
       .eq('onboarding_completed', true);
@@ -50,7 +48,7 @@ export async function GET(request: Request) {
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
 
-        const { count } = await supabase
+        const { count } = await supabaseAdmin
           .from('ad_concepts')
           .select('*', { count: 'exact', head: true })
           .eq('clinic_id', clinic.id)
@@ -71,7 +69,7 @@ export async function GET(request: Request) {
         const toGenerate = Math.min(10, maxConcepts - (count || 0));
 
         // Get competitor insights for angle mix
-        const { data: competitorAds } = await supabase
+        const { data: competitorAds } = await supabaseAdmin
           .from('competitor_ads')
           .select('ai_analysis')
           .eq('clinic_id', clinic.id)
@@ -82,7 +80,7 @@ export async function GET(request: Request) {
         const angleMix = buildAngleMix(competitorAds || []);
 
         // Create batch record first
-        const { data: batch } = await supabase
+        const { data: batch } = await supabaseAdmin
           .from('generation_batches')
           .insert({
             clinic_id: clinic.id,

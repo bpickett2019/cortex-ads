@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchScraperResults, processScrapedAds } from '@/lib/scraper/apify';
-import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { auditLog } from '@/lib/utils/audit';
 
 export async function POST(request: NextRequest) {
@@ -52,8 +52,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Update job status
-    const supabase = await createClient();
-    await supabase
+    await supabaseAdmin
       .from('scraping_jobs')
       .update({
         status: 'completed',

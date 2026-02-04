@@ -2,11 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Public API routes that don't require auth (webhooks, callbacks)
+// Public API routes that don't require auth (webhooks, callbacks, cron)
 const PUBLIC_API_ROUTES = [
     '/api/scraper/webhook',
     '/api/stripe/webhooks',
     '/api/meta/callback',
+    '/api/cron/',
     '/api/auth/',
 ]
 
