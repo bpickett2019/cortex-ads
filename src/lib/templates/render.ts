@@ -1,3 +1,8 @@
+// =============================================
+// Satori Template Renderer
+// HTML-to-PNG fallback when AI generation fails
+// =============================================
+
 import satori from 'satori'
 import sharp from 'sharp'
 import HeadlineHeroTemplate from './headline-hero'
@@ -5,6 +10,9 @@ import DoctorTrustTemplate from './doctor-trust'
 import StatCalloutTemplate from './stat-callout'
 import SplitComparisonTemplate from './split-comparison'
 import TestimonialCardTemplate from './testimonial-card'
+
+// Re-export for fallback usage in image-gen
+export { renderTemplate, generateAllAspectRatios }
 
 export interface TemplateProps {
     headline: string

@@ -19,7 +19,8 @@ For each concept, output a JSON object:
   "cta": "One of: Learn More, Book Now, Get Started, Contact Us, Schedule Consultation",
   "target_audience": {"age_min": 30, "age_max": 65, "gender": "male|female|all", "interests": ["wellness","fitness"]},
   "visual_direction": "Describe the ideal image layout and which template to use. NEVER suggest AI-generated faces.",
-  "template_id": "headline-hero|doctor-trust|stat-callout|split-comparison|testimonial-card"
+  "template_id": "headline-hero|doctor-trust|stat-callout|split-comparison|testimonial-card",
+  "image_prompt_hint": "2-3 sentence description of the ideal photo for this ad. Describe the scene, subject, mood, lighting, and setting. Do NOT mention text, logos, or words in the image. Focus on what a photographer would capture. Example: 'A confident 45-year-old man playing golf at sunset, wearing premium athletic wear, warm golden hour lighting, slight smile showing contentment, golf course and trees in soft focus background.'"
 }
 
 ABSOLUTE RULES — VIOLATION OF THESE MAKES THE AD UNUSABLE:

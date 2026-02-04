@@ -3,6 +3,7 @@ import { AD_GENERATION_PROMPT } from './prompts'
 import { checkCompliance } from '@/lib/compliance/checker'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { auditLog } from '@/lib/utils/audit'
+import { generateCreatives } from '@/lib/image-gen/generate-creative'
 
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY
@@ -22,6 +23,7 @@ export interface GeneratedConcept {
     }
     visual_direction: string
     template_id: 'headline-hero' | 'doctor-trust' | 'stat-callout' | 'split-comparison' | 'testimonial-card'
+    image_prompt_hint?: string
 }
 
 interface ClinicProfile {
@@ -160,6 +162,37 @@ export async function generateAdConcepts(
                 actor: 'ai',
                 details: { status: compliance.status, issues_count: compliance.issues.length }
             })
+
+            // Generate images if compliance passed (not rejected)
+            if (compliance.status !== 'reject') {
+                try {
+                    await generateCreatives({
+                        concept: {
+                            id: conceptRecord.id,
+                            headline: concept.headline,
+                            primary_text: concept.primary_text,
+                            angle_type: concept.angle_type,
+                            cta: concept.cta,
+                            template_id: concept.template_id,
+                            image_prompt: concept.image_prompt_hint,
+                            visual_direction: concept.visual_direction,
+                        },
+                        clinic: {
+                            id: clinic.id,
+                            name: clinic.name,
+                            services: clinic.services,
+                            brand_assets: clinic.brand_assets,
+                            doctor_info: clinic.doctor_info,
+                        },
+                        batchId,
+                    });
+
+                    console.log(`[generate-ads] Images generated for concept ${conceptRecord.id}`);
+                } catch (imageError) {
+                    // Log but don't fail - images are enhancement, copy is the product
+                    console.error(`[generate-ads] Image generation failed for concept ${conceptRecord.id}:`, imageError);
+                }
+            }
         }
 
         // Update batch status
