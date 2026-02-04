@@ -28,7 +28,7 @@ export default async function DashboardPage() {
 
     const { data: stats } = await supabase
         .from('ad_concepts')
-        .select('compliance_status, approval_status')
+        .select('compliance_status, approval_status, published_at')
         .eq('clinic_id', clinic?.id)
 
     const pendingReview = stats?.filter(s => s.approval_status === 'pending').length || 0

@@ -1,55 +1,50 @@
 # Cortex Ads - Healthcare Marketing Platform
 
-A Next.js-based healthcare marketing SaaS platform that generates compliant advertising for TRT/HRT/wellness clinics.
+A production-ready healthcare marketing SaaS platform that generates, reviews, and publishes compliant advertising for TRT/HRT/wellness clinics.
 
-## 🏗️ Build Status
+## ✅ Production Status
 
-**✅ COMPLETED STEPS (1-8):**
+**ALL 15 STEPS COMPLETE** — Full MVP ready for deployment
 
-1. **Project Init** ✅
-2. **Auth + Middleware** ✅
-3. **Onboarding Wizard** ✅
-4. **Dashboard Layout** ✅
-5. **Compliance Engine** ✅
-6. **Ad Generation Engine** ✅
-7. **Batch Review UI** ✅
-8. **Image Template System** ✅
+## 🏗️ Completed Features
 
-### **All 5 Image Templates Created:**
-- ✅ `headline-hero.tsx` - Bold headline focus
-- ✅ `doctor-trust.tsx` - Doctor credibility
-- ✅ `stat-callout.tsx` - Statistics/numbers
-- ✅ `split-comparison.tsx` - Before/after style
-- ✅ `testimonial-card.tsx` - Social proof
+### Core Platform (Steps 1-8)
+1. **Project Init** ✅ — Next.js 15, TypeScript, Tailwind, shadcn/ui
+2. **Auth + Middleware** ✅ — Supabase Auth with RLS
+3. **Onboarding Wizard** ✅ — 4-step clinic setup
+4. **Dashboard Layout** ✅ — Stats, actions, batch review
+5. **Compliance Engine** ✅ — Two-pass checking (rules + LLM)
+6. **Ad Generation Engine** ✅ — Claude Sonnet integration
+7. **Batch Review UI** ✅ — Approve/reject with feedback
+8. **Image Template System** ✅ — 5 Satori templates, 3 aspect ratios
 
-### **Complete API Surface:**
-- ✅ `/api/ads/generate` - Trigger batch generation
-- ✅ `/api/ads/[id]/approve` - Approve concept
-- ✅ `/api/ads/[id]/reject` - Reject concept
-- ✅ `/api/ads/[id]/generate-images` - Generate Satori images
+### Production Integrations (Steps 9-15)
+9. **Apify Scraper** ✅ — Competitor ad scraping from Meta Ad Library
+10. **Meta OAuth + Publishing** ✅ — Full Meta Marketing API integration
+11. **Performance Tracking** ✅ — Daily metrics pull, CPA/CTR tracking
+12. **Stripe Billing** ✅ — 3-tier subscriptions ($997-$1997/mo)
+13. **Weekly Cron** ✅ — Automated generation based on tier limits
+14. **Settings UI** ✅ — Integration management, billing
+15. **Polish** ✅ — Rate limiting, security fixes, token refresh
 
-## 🚧 NEXT STEPS (9-15):
+## 🔐 Security & Compliance
 
-9. **Apify Scraper Integration** - Not started
-10. **Meta OAuth + Publishing** - Not started
-11. **Performance Tracking** - Not started
-12. **Stripe Billing** - Not started
-13. **Weekly Cron** - Not started
-14. **Polish** - Not started
+### Rate Limiting
+- Hourly limits by tier (5/15/50 requests)
+- Weekly generation limits enforced
+- Input sanitization to prevent prompt injection
 
-## 🎯 Current State
+### Authentication
+- API routes protected (except webhooks)
+- Meta tokens use Authorization headers (not URL params)
+- Auto-refresh tokens 7 days before expiry
+- AES-256-GCM encryption for stored tokens
 
-**FULLY FUNCTIONAL MVP:**
-- ✅ User authentication with Supabase Auth
-- ✅ Multi-step clinic onboarding
-- ✅ Dashboard with stats and navigation
-- ✅ Ad generation with Claude AI
-- ✅ Two-pass compliance checking (rule-based + LLM)
-- ✅ Batch review UI with approve/reject actions
-- ✅ 5 customizable image templates
-- ✅ Server-side image generation (Satori + Sharp)
-- ✅ Audit logging for all actions
-- ✅ RLS-secured database
+### Compliance
+- Two-pass checking: rule-based + LLM review
+- **Sonnet (not Opus)** for cost-effective compliance analysis
+- ReDoS protection on regex patterns
+- Banned phrases for FDA/FTC/HIPAA/Meta policies
 
 ## 📁 Project Structure
 
@@ -57,76 +52,153 @@ A Next.js-based healthcare marketing SaaS platform that generates compliant adve
 cortex-ads/
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/           # Login/signup pages
-│   │   ├── (dashboard)/      # Main application
-│   │   └── api/              # API routes
+│   │   ├── (auth)/           # Login/signup
+│   │   ├── (dashboard)/      # Main app pages
+│   │   └── api/              # API routes (26 endpoints)
 │   ├── components/
 │   │   ├── ui/               # shadcn components
 │   │   └── ads/              # Ad-specific components
 │   └── lib/
-│       ├── ai/               # Claude integration
+│       ├── ai/               # Claude generation
 │       ├── compliance/       # Compliance engine
-│       ├── templates/        # 5 Satori templates
-│       └── supabase/         # Database clients
-├── supabase/schema.sql       # Complete database schema
+│       ├── meta/             # Meta Marketing API
+│       ├── scraper/          # Apify integration
+│       ├── stripe/           # Billing
+│       ├── templates/        # Satori image templates
+│       └── utils/            # Rate limiting, encryption
+├── supabase/
+│   ├── schema.sql            # Base schema
+│   └── schema-additions.sql  # Scraping jobs, rate limits
 └── README.md
 ```
 
-## 🚀 Setup Required
+## 🚀 Deployment Setup
 
-1. **Supabase Project:**
-   ```bash
-   # Run the schema
-   psql -d your_db < supabase/schema.sql
-   
-   # Seed compliance rules
-   npm run db:seed
-   
-   # Generate types
-   npm run db:types
-   ```
+### 1. Database (Supabase)
+```bash
+# Run migrations
+psql -d your_db < supabase/schema.sql
+psql -d your_db < supabase/schema-additions.sql
 
-2. **Environment Variables:**
-   ```bash
-   cp .env.local.example .env.local
-   # Fill in: Supabase, Anthropic, Meta, Stripe keys
-   ```
+# Seed compliance rules
+npm run db:seed
 
-3. **Build & Run:**
-   ```bash
-   npm install
-   npm run build  # Compiles successfully
-   npm run dev
-   ```
-
-## 🎨 Image Generation Flow
-
-```
-Template Props → Satori → SVG → Sharp → PNG → Supabase Storage → Public URL
+# Generate types
+npm run db:types
 ```
 
-All 3 aspect ratios generated:
-- **Square** (1:1) - 1080x1080 - Instagram, Facebook feed
-- **Portrait** (4:5) - 1080x1350 - Instagram feed
-- **Landscape** (1.91:1) - 1200x628 - Facebook ads
+### 2. Environment Variables
+```bash
+# Required in .env.local (not committed)
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+ANTHROPIC_API_KEY=
+META_APP_ID=
+META_APP_SECRET=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+APIFY_TOKEN=
+CRON_SECRET=
+```
 
-## ✅ Compliance System
+### 3. Stripe Products
+Create 3 products with these price IDs:
+- **Starter:** $997/mo — 10 ads/month
+- **Growth:** $1497/mo — 25 ads/month  
+- **Full Stack:** $1997/mo — Unlimited
 
-**Two-Pass Architecture:**
-1. **Rule-based scanner** - Banned phrases/patterns (FDA/FTC/HIPAA)
-2. **LLM review** - Claude Opus for nuanced legal analysis
+### 4. Meta App
+- Create at developers.facebook.com
+- Add Marketing API product
+- OAuth redirect: `/api/meta/callback`
 
-**Statuses:**
-- `passed` - Ready for approval
-- `flagged` - Warnings but can be approved
-- `rejected` - Critical violations, cannot approve
+### 5. Build & Deploy
+```bash
+npm install
+npm run build
+npm run dev  # or deploy to Vercel
+```
 
-## 🎯 Ready for Production
+## 🎯 API Endpoints
 
-The core platform is **complete and functional**. Next focus:
-- Meta OAuth flow for ad publishing
-- Apify competitor scraping
-- Stripe billing integration
-- Performance tracking dashboard
+### Ads
+- `POST /api/ads/generate` — Generate new batch (rate limited)
+- `POST /api/ads/[id]/approve` — Approve concept
+- `POST /api/ads/[id]/reject` — Reject with feedback
+- `POST /api/ads/[id]/generate-images` — Generate images
 
-**Estimated completion:** Steps 9-14 would take ~2-3 more days of work.
+### Meta
+- `GET /api/meta/oauth` — Start OAuth flow
+- `GET /api/meta/callback` — OAuth callback
+- `POST /api/meta/publish` — Publish to Meta Ads
+
+### Stripe
+- `POST /api/stripe/checkout` — Create checkout session
+- `POST /api/stripe/webhooks` — Stripe events
+
+### Cron (Protected by CRON_SECRET)
+- `GET /api/cron/pull-performance` — Daily metrics sync
+- `GET /api/cron/generate-weekly` — Weekly auto-generation
+
+### Competitors
+- `GET /api/competitors` — List competitors
+- `POST /api/competitors` — Add competitor
+- `POST /api/scraper/run` — Trigger scraper
+- `POST /api/scraper/webhook` — Apify webhook (public)
+
+## 🎨 Image Generation
+
+**Templates:**
+- `headline-hero` — Bold headline focus
+- `doctor-trust` — Doctor credibility
+- `stat-callout` — Statistics/numbers
+- `split-comparison` — Before/after style
+- `testimonial-card` — Social proof
+
+**Aspect Ratios:**
+- Square (1:1) — 1080x1080
+- Portrait (4:5) — 1080x1350
+- Landscape (1.91:1) — 1200x628
+
+## 📊 Compliance System
+
+**Three Statuses:**
+- `passed` — Ready for approval
+- `flagged` — Warnings but approvable
+- `rejected` — Critical violations
+
+**Rule Categories:**
+- FDA (medical claims)
+- FTC (advertising standards)
+- HIPAA (privacy)
+- Meta (platform policies)
+- State-specific regulations
+
+## 💰 Billing Tiers
+
+| Tier | Price | Ads/Month | Ad Spend Limit |
+|------|-------|-----------|----------------|
+| Starter | $997 | 10 | $5,000 |
+| Growth | $1,497 | 25 | $15,000 |
+| Full Stack | $1,997 | Unlimited | $50,000 |
+
+## 🚧 Known Limitations
+
+1. **Tests:** Zero automated test coverage — compliance engine needs tests
+2. **Google Ads:** OAuth scaffolded but not fully implemented
+3. **SMS:** MSG91 integration in DRY_RUN mode
+4. **Image Storage:** Assumes Supabase Storage (configurable)
+
+## 🎯 Next Priorities
+
+1. Add integration tests for compliance engine
+2. Complete Google Ads OAuth + publishing
+3. Implement SMS provider (Twilio alternative)
+4. Add real-time WebSocket for generation progress
+5. Build campaign performance dashboard
+
+## 📄 License
+
+Private — Cortex Labs internal use

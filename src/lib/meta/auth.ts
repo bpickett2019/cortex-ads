@@ -116,7 +116,12 @@ export async function getAdAccounts(accessToken: string): Promise<
   { id: string; name: string; accountStatus: number }[]
 > {
   const response = await fetch(
-    `${META_GRAPH_URL}/me/adaccounts?fields=id,name,account_status&access_token=${accessToken}`
+    `${META_GRAPH_URL}/me/adaccounts?fields=id,name,account_status`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    }
   );
 
   if (!response.ok) {
@@ -219,6 +224,7 @@ export async function hasMetaAuth(clinicId: string): Promise<boolean> {
 
 /**
  * Make authenticated request to Meta Marketing API
+ * Uses Authorization header instead of URL params for security
  */
 async function metaApiRequest(
   endpoint: string,
@@ -231,6 +237,7 @@ async function metaApiRequest(
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
       ...options.headers,
     },
   });
@@ -310,7 +317,12 @@ async function findOrCreateCampaign(
     // Verify campaign still exists in Meta
     try {
       const response = await fetch(
-        `${META_GRAPH_URL}/${existingConcept.meta_campaign_id}?access_token=${accessToken}`
+        `${META_GRAPH_URL}/${existingConcept.meta_campaign_id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
       );
       if (response.ok) {
         return existingConcept.meta_campaign_id;
@@ -329,7 +341,6 @@ async function findOrCreateCampaign(
     status: 'ACTIVE',
     special_ad_categories: ['HEALTHCARE'],
     daily_budget: Math.round(dailyBudget * 100), // cents
-    access_token: accessToken,
   };
 
   const data = await metaApiRequest(endpoint, accessToken, {
@@ -361,7 +372,6 @@ export async function createAdSet(
     bid_strategy: config.bidStrategy || 'LOWEST_COST_WITHOUT_CAP',
     daily_budget: Math.round(dailyBudget * 100), // cents
     status: 'ACTIVE',
-    access_token: accessToken,
   };
 
   const data = await metaApiRequest(endpoint, accessToken, {
@@ -385,7 +395,6 @@ export async function uploadImage(
   const body = {
     filename: `ad_image_${Date.now()}.jpg`,
     url: imageUrl,
-    access_token: accessToken,
   };
 
   const data = await metaApiRequest(endpoint, accessToken, {
@@ -428,7 +437,6 @@ export async function createAdCreative(
   const body = {
     name: config.name,
     object_story_spec: objectStorySpec,
-    access_token: accessToken,
   };
 
   const data = await metaApiRequest(endpoint, accessToken, {
@@ -457,7 +465,6 @@ export async function createAd(
     adset_id: adSetId,
     creative: { creative_id: creativeId },
     status,
-    access_token: accessToken,
   };
 
   const data = await metaApiRequest(endpoint, accessToken, {
@@ -649,7 +656,6 @@ export async function getAdInsights(
   const endpoint = `/${adAccountId}/insights`;
   
   const params = new URLSearchParams({
-    access_token: accessToken,
     level: 'ad',
     fields: 'ad_id,campaign_id,adset_id,spend,impressions,clicks,ctr,cpc,cpp,actions,action_values',
     date_preset: datePreset,
@@ -678,7 +684,6 @@ export async function updateAdStatus(
     method: 'POST',
     body: JSON.stringify({
       status,
-      access_token: accessToken,
     }),
   });
 }

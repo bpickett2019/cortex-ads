@@ -2,20 +2,49 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Public API routes that don't require auth (webhooks, callbacks)
+const PUBLIC_API_ROUTES = [
+    '/api/scraper/webhook',
+    '/api/stripe/webhooks',
+    '/api/meta/callback',
+    '/api/auth/',
+]
+
+// Public page routes
+const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback']
+
 export async function middleware(request: NextRequest) {
     const supabase = await createClient()
 
     // Check auth status
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Public routes that don't require auth
-    const publicRoutes = ['/login', '/signup', '/auth/callback']
-    const isPublicRoute = publicRoutes.some(route =>
-        request.nextUrl.pathname.startsWith(route)
+    const pathname = request.nextUrl.pathname
+
+    // Check if it's a public API route
+    const isPublicApiRoute = PUBLIC_API_ROUTES.some(route =>
+        pathname.startsWith(route)
     )
 
-    // API routes handling
-    if (request.nextUrl.pathname.startsWith('/api/')) {
+    // Check if it's a public page route
+    const isPublicRoute = PUBLIC_ROUTES.some(route =>
+        pathname.startsWith(route)
+    )
+
+    // API routes require auth (except public ones)
+    if (pathname.startsWith('/api/')) {
+        if (isPublicApiRoute) {
+            return NextResponse.next()
+        }
+
+        // Require auth for protected API routes
+        if (!user) {
+            return NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
+
         return NextResponse.next()
     }
 
