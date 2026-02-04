@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "src/app/api/**": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/generate-weekly",
+      "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/pull-performance",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
